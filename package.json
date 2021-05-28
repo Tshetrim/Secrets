@@ -10,9 +10,11 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "bcrypt": "^5.0.1",
     "dotenv": "^10.0.0",
     "ejs": "^3.1.6",
     "express": "^4.17.1",
+    "js-sha512": "^0.8.0",
     "lodash": "^4.17.21",
     "mongoose": "^5.12.11",
     "mongoose-encryption": "^2.1.0"
