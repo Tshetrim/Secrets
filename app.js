@@ -3,8 +3,10 @@ require('dotenv').config();
 const express = require("express");
 const mongoose = require("mongoose");
 const _ = require("lodash");
-//const encrypt = require("mongoose-encryption");
-const sha512 = require('js-sha512');
+//const encrypt = require("mongoose-encryption"); //level 2 - encryption
+//const sha512 = require('js-sha512'); //level 3 - hashing
+const bcrypt = require("bcrypt"); //level 4 - salting and bcrypt
+const saltRounds = 10;
 
 //setting up express and middleware
 const app = express();
@@ -50,20 +52,23 @@ app.route("/login")
   })
   .post((req,res)=>{
     const email = req.body.username;
-    const password = sha512(req.body.password);
+    const password = req.body.password;
+
     User.findOne({email:email},(err, foundMatch)=>{
       if(err)
         console.log(err);
       else {
         if(foundMatch){
-          if(foundMatch.password === password){
-            res.render("secrets");
-          }
-          else
-            res.render("login");
+            bcrypt.compare(password, foundMatch.password, function(err, result) {
+            if(result){
+              res.render("secrets");
+            }
+            else
+              res.render("login");
+          });
         }
         else{
-          console.log("no match");
+          console.log("no email match");
           res.render("login");
         }
       }
@@ -76,11 +81,17 @@ app.route("/register")
     res.render("register",{});
   })
   .post((req,res)=>{
-    const newUser = new User({
-      email: req.body.username,
-      password: sha512(req.body.password)
+    bcrypt.hash(req.body.password,saltRounds,(err,hash)=>{
+      if(err)
+        console.log(err);
+      else{
+        const newUser = new User({
+          email: req.body.username,
+          password: hash
+        });
+        newUser.save((err)=>err ? console.log("req.body.username "+ err) : res.render("secrets"));
+      }
     });
-    newUser.save((err)=>err ? console.log("req.body.username "+ err) : res.render("secrets"));
   });
 
 /*app.route("/secrets")
