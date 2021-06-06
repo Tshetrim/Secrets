@@ -14,6 +14,12 @@
       <button type="submit" class="btn btn-dark">Submit</button>
     </form>
 
+    <h3 class="mt-4">Your Secrets:</h3>
+    <%for(const secret of userSecrets){%>
+      <p class="secret-text"><%=secret.secret%></p>
+    <%}%>
+
+
 
   </div>
 </div>

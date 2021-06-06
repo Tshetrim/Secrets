@@ -36,13 +36,27 @@ app.use(passport.initialize());
 app.use(passport.session()); //The passport.session() middleware uses the user property found on req.session.passport.user to re-initialize the req.user object to equal the user attached to the session via the passport.deserializeUser() function.
 
 //connecting to MongoDB server
-mongoose.connect("mongodb://localhost:27017/userDB",{
+mongoose.connect(process.env.MONGO_SRV+"/userDB",{
   useUnifiedTopology: true,
   useNewUrlParser: true,
   useCreateIndex: true
 },(err) => err ? console.log(err) : console.log("Connected to mongod server"));
 
 //defining Mongo schemas
+//secrets collection
+const secretSchema = new mongoose.Schema({
+  secret: {
+    type: String
+  }
+})
+
+const Secret = mongoose.model("Secret", secretSchema);
+
+const secret = new Secret({
+  secret: "Jack Bauer is my Hero"
+});
+
+//user
 const userSchema = new mongoose.Schema({
   username: {
     type: String,
@@ -66,7 +80,8 @@ const userSchema = new mongoose.Schema({
     type: String,
     unique: true,
     sparse: true
-  }
+  },
+  secrets: [secretSchema]
 });
 
 ////setting up mongoose encryption
@@ -91,7 +106,9 @@ passport.deserializeUser(function(id, done) {
   });
 });
 
-const homeURL = "http://localhost:3000";
+
+//const homeURL = "http://localhost:3000";
+const homeURL = "https://secrets-tsh.herokuapp.com";
 
 //establishing Google Strategy
 passport.use(new GoogleStrategy({
@@ -177,7 +194,14 @@ app.route("/secrets")
     res.set('Cache-Control', 'no-cache, private, no-store, must-revalidate, max-stal   e=0, post-check=0, pre-check=0');
 
     if(req.isAuthenticated()){
-      res.render("secrets",{});
+      User.find({"secrets.0": {$exists: true}},(err,usersWithSecrets)=>{
+        if(err)
+          console.log(err);
+        else{
+          //console.log("Users with secrets:" +usersWithSecrets);
+          res.render("secrets",{usersWithSecrets:usersWithSecrets});
+        }
+      });
     }
     else{
       res.redirect("/login")
@@ -186,7 +210,32 @@ app.route("/secrets")
 
 app.route("/submit")
   .get((req,res)=>{
-    res.render("submit",{});
+    if(req.isAuthenticated()){
+      res.render("submit",{userSecrets:req.user.secrets});
+    }
+    else{
+      res.redirect("/login")
+    }
+  })
+  .post((req,res)=>{
+    const submittedSecret = req.body.secret;
+    console.log(req.user);
+    const newSecret = new Secret({
+      secret: submittedSecret
+    });
+
+    User.findById(req.user.id, (err,foundUser)=>{
+      if(err)
+        console.log(err);
+      else{
+        if(foundUser){
+          foundUser.secrets.push(newSecret);
+          foundUser.save(()=>{
+            res.redirect("/secrets");
+          });
+        }
+      }
+    });
   });
 
 app.route("/logout")
@@ -232,4 +281,4 @@ app.route("/auth/twitter")
     });
 
 //setting up server spin up
-app.listen(3000, ()=>console.log("Server started on port 3000"));
+app.listen(process.env.PORT||3000, ()=>console.log("Server started on port 3000"));
