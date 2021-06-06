@@ -10,6 +10,12 @@ const _ = require("lodash");
 const session = require("express-session")
 const passport = require("passport");
 const passportLocalMongoose = require("passport-local-mongoose");
+//level 6 - OAuth
+const GoogleStrategy = require('passport-google-oauth20').Strategy;
+const FacebookStrategy = require('passport-facebook').Strategy;
+const TwitterStrategy = require('passport-twitter').Strategy;
+const findOrCreate = require('mongoose-findorcreate')
+
 
 //setting up express and middleware
 const app = express();
@@ -40,10 +46,26 @@ mongoose.connect("mongodb://localhost:27017/userDB",{
 const userSchema = new mongoose.Schema({
   username: {
     type: String,
-    unique: true
+    unique: true,
+    sparse: true
   },
   password: {
     type: String
+  },
+  googleId: {
+    type: String,
+    unique: true,
+    sparse: true
+  },
+  facebookId: {
+    type: String,
+    unique: true,
+    sparse: true
+  },
+  TwitterId: {
+    type: String,
+    unique: true,
+    sparse: true
   }
 });
 
@@ -52,14 +74,63 @@ const userSchema = new mongoose.Schema({
 
 //plugin to passportLocalMongoose
 userSchema.plugin(passportLocalMongoose);
+userSchema.plugin(findOrCreate);
 
 //defining Mongo Models
 const User = mongoose.model("User", userSchema);
 
 passport.use(User.createStrategy());
 
-passport.serializeUser(User.serializeUser());
-passport.deserializeUser(User.deserializeUser());
+passport.serializeUser(function(user, done) {
+  done(null, user.id);
+});
+
+passport.deserializeUser(function(id, done) {
+  User.findById(id, function(err, user) {
+    done(err, user);
+  });
+});
+
+const homeURL = "http://localhost:3000";
+
+//establishing Google Strategy
+passport.use(new GoogleStrategy({
+    clientID: process.env.GOOGLE_CLIENT_ID,
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+    callbackURL: homeURL+"/auth/google/secrets"
+  },
+  function(accessToken, refreshToken, profile, cb) {
+    User.findOrCreate({ googleId: profile.id }, function (err, user) {
+      return cb(err, user);
+    });
+  }
+));
+
+//establshing Facebook Strategy
+passport.use(new FacebookStrategy({
+    clientID: process.env.FACEBOOK_APP_ID,
+    clientSecret: process.env.FACEBOOK_APP_SECRET,
+    callbackURL: homeURL+"/auth/facebook/secrets"
+  },
+  function(accessToken, refreshToken, profile, cb) {
+    User.findOrCreate({ facebookId: profile.id }, function (err, user) {
+      return cb(err, user);
+    });
+  }
+));
+
+//establshing Twitter Strategy
+passport.use(new TwitterStrategy({
+    consumerKey: process.env.TWITTER_CONSUMER_KEY,
+    consumerSecret: process.env.TWITTER_CONSUMER_SECRET,
+    callbackURL: homeURL+"/auth/twitter/secrets"
+  },
+  function(token, tokenSecret, profile, cb) {
+    User.findOrCreate({ twitterId: profile.id }, function (err, user) {
+      return cb(err, user);
+    });
+  }
+));
 
 //setting up routes
 app.route("/")
@@ -70,7 +141,12 @@ app.route("/")
 //handling loging in
 app.route("/login")
   .get((req,res)=>{
-    res.render("login",{});
+    if(req.isAuthenticated()){
+      res.redirect("/secrets");
+    }
+    else{
+      res.render("login",{})
+    }
   })
   .post(passport.authenticate("local",  { failureRedirect: '/login'}), (req,res)=>{
     res.redirect("/secrets");
@@ -119,6 +195,41 @@ app.route("/logout")
     res.redirect("/");
   });
 
+//routes to handle OAuth through Google
+app.route("/auth/google")
+  .get(passport.authenticate("google", { scope: ["email","profile"]}), (req,res)=>{
+
+  });
+
+  app.route("/auth/google/secrets")
+    .get(passport.authenticate('google', { failureRedirect: '/login' }), (req, res)=>{
+      // Successful authentication, redirect secrets.
+      res.redirect('/secrets');
+    });
+
+//routes to handle OAuth through Facebook
+app.route("/auth/facebook")
+  .get(passport.authenticate("facebook"), (req,res)=>{
+
+  });
+
+  app.route("/auth/facebook/secrets")
+    .get(passport.authenticate('facebook', { failureRedirect: '/login' }), (req, res)=>{
+      // Successful authentication, redirect secrets.
+      res.redirect('/secrets');
+    });
+
+//routes to handle OAuth through Twitter
+app.route("/auth/twitter")
+  .get(passport.authenticate("twitter"), (req,res)=>{
+
+  });
+
+  app.route("/auth/twitter/secrets")
+    .get(passport.authenticate('twitter', { failureRedirect: '/login' }), (req, res)=>{
+      // Successful authentication, redirect secrets.
+      res.redirect('/secrets');
+    });
 
 //setting up server spin up
 app.listen(3000, ()=>console.log("Server started on port 3000"));
