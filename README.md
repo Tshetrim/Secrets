@@ -11,7 +11,7 @@ Level 3: basic hashing passwords - used SHA512
 
 Level 4: hashing and salting passwords - using bcrypt
 
-Level 5: implementing cookie and session based authentication using Passport local 
+Level 5: implementing cookie and session based authentication using passport-local and express-session 
 
 Level 6: implement OAuth 2.0 - third-party login with Google, Facebook, and Twitter using their respective Passport.js strategies 
 
